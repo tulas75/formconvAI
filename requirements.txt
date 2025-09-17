@@ -1,0 +1,4 @@
+ smolagents[litellm]
+smolagents[mcp]
+python-dotenv
+requests

@@ -1,0 +1,14 @@
+# Excel files
+*.xlsx
+
+# Text result files
+*.txt
+
+# JSON result files
+*.json
+
+# Grep files
+grep
+
+# Virtual environment
+.venv/
