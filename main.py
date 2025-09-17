@@ -77,7 +77,6 @@ Important instructions:
                               additional_authorized_imports=[
                                 "json",
                                 "pandas",
-                                "openpyxl"
                              ],                      
             )
             result = agent.run(full_prompt)
