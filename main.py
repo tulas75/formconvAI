@@ -1,275 +1,19 @@
+#!/usr/bin/env python3
+"""
+FormConv AI - Command Line Interface
+===================================
+
+This script generates XLSForm files using LLM and converts them to JSON format.
+"""
+
 import sys
 import os
-import requests
-import shutil
-import glob
-import datetime
-from smolagents import MCPClient, CodeAgent, LiteLLMModel, ToolCallingAgent, tool
-from mcp import StdioServerParameters
-from dotenv import load_dotenv
 
+# Add the parent directory to the path so we can import the formconv package
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-def generate_timestamped_filename(base_name, extension):
-    """Generate a timestamped filename in the format base_name_YYYYMMDD_HHMMSS.extension"""
-    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    return f"output_files/{base_name}_{timestamp}{extension}"
+from formconv.core import generate_form_json
 
-
-def ensure_output_directory():
-    """Ensure the output_files directory exists"""
-    output_dir = "output_files"
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
-    return output_dir
-#import litellm
-#litellm._turn_on_debug()
-
-mcp_filesystem = StdioServerParameters(
-    command="uvx",
-    args=["excel-mcp-server", "stdio"]
-)
-
-load_dotenv()  # Load environment variables from .env file
-
-# Get model configuration from environment variables
-model_id = os.getenv("MODEL_ID", "deepinfra/Qwen/Qwen3-Next-80B-A3B-Instruct")
-api_key = os.getenv("DEEPINFRA_API_KEY")
-
-# Initialize the model with API key if provided
-if api_key:
-    model = LiteLLMModel(model_id=model_id, temperature=0.6, api_key=api_key)
-else:
-    model = LiteLLMModel(model_id=model_id, temperature=0.6)
-
-# Read the XLSForm prompt template
-with open("xlsform_prompt.txt", "r") as f:
-    xlsform_prompt_template = f.read()
-
-def validate_xlsform_file(filename):
-    """Check if the XLSForm file was created successfully in the current directory"""
-    current_dir = os.getcwd()
-    expected_file_path = os.path.join(current_dir, filename)
-    
-    # Check if file exists in the expected location
-    if os.path.exists(expected_file_path):
-        if os.path.getsize(expected_file_path) > 0:
-            return True
-        else:
-            print(f"Error: XLSForm file '{filename}' is empty.")
-            return False
-    else:
-        # File not in expected location, check if it exists elsewhere and move it
-        print(f"Error: XLSForm file '{filename}' was not created in the current directory.")
-        # Try to find and move the file from other locations
-        if find_and_move_file(filename, expected_file_path):
-            # Check if moved file is valid
-            if os.path.getsize(expected_file_path) > 0:
-                print(f"Successfully moved '{filename}' to current directory.")
-                return True
-            else:
-                print(f"Error: Moved XLSForm file '{filename}' is empty.")
-                return False
-        return False
-
-def find_and_move_file(filename, expected_file_path):
-    """Find a file that might be in a different location and move it to the expected location"""
-    # First, check if the file exists with just the basename in current directory
-    simple_filename = os.path.basename(filename)
-    if os.path.exists(simple_filename):
-        try:
-            shutil.move(simple_filename, expected_file_path)
-            print(f"Moved '{simple_filename}' to '{expected_file_path}'")
-            return True
-        except Exception as e:
-            print(f"Warning: Could not move file from '{simple_filename}': {e}")
-    
-    # Search for the file in common temporary locations
-    search_paths = [
-        "/tmp/",
-        "/var/tmp/",
-        os.path.expanduser("~/Downloads/"),
-        os.path.expanduser("~/Desktop/"),
-        os.getcwd()  # Also check current directory for any file with the name
-    ]
-    
-    for search_path in search_paths:
-        if os.path.exists(search_path):
-            # Look for exact filename
-            potential_path = os.path.join(search_path, simple_filename)
-            if os.path.exists(potential_path):
-                try:
-                    shutil.move(potential_path, expected_file_path)
-                    print(f"Moved '{simple_filename}' from '{search_path}' to '{expected_file_path}'")
-                    return True
-                except Exception as e:
-                    print(f"Warning: Could not move file from '{potential_path}': {e}")
-    
-    # If not found in common locations, search more broadly (but not too broadly)
-    try:
-        # Search in home directory and subdirectories, but limit depth to avoid long searches
-        home_dir = os.path.expanduser("~")
-        for root, dirs, files in os.walk(home_dir):
-            # Limit search depth to avoid searching the entire system
-            depth = root[len(home_dir):].count(os.sep)
-            if depth > 3:  # Don't go more than 3 levels deep
-                dirs[:] = []  # Don't recurse deeper
-                continue
-                
-            if simple_filename in files:
-                potential_path = os.path.join(root, simple_filename)
-                try:
-                    shutil.move(potential_path, expected_file_path)
-                    print(f"Moved '{simple_filename}' from '{root}' to '{expected_file_path}'")
-                    return True
-                except Exception as e:
-                    print(f"Warning: Could not move file from '{potential_path}': {e}")
-    except Exception as e:
-        print(f"Warning: Could not search for misplaced file: {e}")
-    
-    return False
-
-def create_xlsform(user_query, xlsform_filename):
-    """Create an XLSForm based on user query using LLM"""
-    try:
-        with MCPClient([mcp_filesystem]) as mcp_tools:
-            tools = list(mcp_tools)
-            
-            # Get the absolute path of the current directory
-            current_dir = os.getcwd()
-            expected_file_path = os.path.join(current_dir, xlsform_filename)
-            
-            # Extract just the filename without the path for the LLM
-            simple_filename = os.path.basename(xlsform_filename)
-            
-            # Create the full prompt by combining the template with user query
-            full_prompt = f"""
-{xlsform_prompt_template}
-
-User Query: {user_query}
-
-Please generate a complete XLSForm structure that addresses the user's requirements. 
-Return the result as a valid Excel file with the sheets (survey, choices, settings) properly formatted.
-Create the xlsx file using excel-mcp-server tool.
-Save the file as '{simple_filename}' in the current folder.
-
-Important instructions:
-- ALWAYS create ALL three required sheets: survey, choices, and settings (even if choices is empty)
-- DO NOT create any extra sheets like 'Sheet1'
-- Make sure to save the file properly in the current directory
-- Avoid any complex constraints or validation formulas
-- Ensure the file is saved with the exact name '{simple_filename}'
-- DO NOT save the file in any temporary directories like /tmp
-- The choices sheet must have the headers 'list_name', 'name', 'label' even if it contains no data rows
-- Every sheet must have headers in the first row
-"""
-            
-            agent = CodeAgent(tools=tools, 
-                              model=model, 
-                              #add_base_tools=True,
-                              additional_authorized_imports=[
-                                "json",
-                                "os"
-                             ],                      
-            )
-            result = agent.run(full_prompt)
-            print(f"XLSForm creation result: {result}")
-            
-            # Wait a moment for file creation
-            import time
-            time.sleep(2)
-            
-            # Check if the file was created in the current directory
-            if os.path.exists(simple_filename):
-                # Move the file to the output_files directory
-                try:
-                    shutil.move(simple_filename, expected_file_path)
-                    print(f"Moved file from '{simple_filename}' to '{expected_file_path}'")
-                except Exception as e:
-                    print(f"Error moving file: {e}")
-                    return False
-            else:
-                # Try to find the file in common locations and move it
-                print(f"File '{simple_filename}' not found in current directory. Searching...")
-                found = False
-                search_paths = ["/tmp/", "/var/tmp/", os.path.expanduser("~/Downloads/")]
-                for search_path in search_paths:
-                    potential_path = os.path.join(search_path, simple_filename)
-                    if os.path.exists(potential_path):
-                        try:
-                            shutil.move(potential_path, expected_file_path)
-                            print(f"Found and moved file from '{potential_path}' to '{expected_file_path}'")
-                            found = True
-                            break
-                        except Exception as e:
-                            print(f"Error moving file from '{potential_path}': {e}")
-                
-                if not found:
-                    print(f"File '{simple_filename}' not found in common locations.")
-                    # List files in current directory to help debug
-                    print("Files in current directory:")
-                    for file in os.listdir("."):
-                        print(f"  {file}")
-                    return False
-            
-            # Validate that the file was created in the correct location
-            if not validate_xlsform_file(xlsform_filename):
-                return False
-                
-            print(f"Successfully verified XLSForm file at {expected_file_path}")
-            return result
-    except Exception as e:
-        print(f"Error creating XLSForm: {e}")
-        return False
-
-def convert_xlsx_to_json(xlsform_filename, json_filename):
-    """Convert the XLSX file to JSON using the formconv API"""
-    # First check if the XLSForm file exists
-    if not validate_xlsform_file(xlsform_filename):
-        return None
-        
-    try:
-        current_dir = os.getcwd()
-        file_path = os.path.join(current_dir, xlsform_filename)
-        
-        print("Sending XLSForm to conversion service...")
-        # Use requests to convert XLSX to JSON
-        with open(file_path, "rb") as file:
-            files = {"excelFile": file}
-            response = requests.post(
-                "https://formconv.herokuapp.com/result.json",
-                files=files,
-                timeout=30
-            )
-        
-        if response.status_code == 200:
-            # Check if the response is valid JSON
-            if response.text.strip().startswith("{") or response.text.strip().startswith("["):
-                print("Successfully converted XLSX to JSON")
-                # Save the JSON result to a file with timestamped name
-                json_file_path = os.path.join(current_dir, json_filename)
-                with open(json_file_path, "w") as f:
-                    f.write(response.text)
-                return response.text
-            else:
-                print("Error: Server did not return valid JSON")
-                print(f"Server response: {response.text}")
-                print(f"Response headers: {response.headers}")
-                return None
-        else:
-            print(f"Error converting XLSX to JSON: {response.status_code} - {response.text}")
-            # Save the error response for debugging
-            error_file_path = os.path.join(current_dir, "output_files/conversion_error.txt")
-            with open(error_file_path, "w") as f:
-                f.write(f"Status Code: {response.status_code}\n")
-                f.write(f"Response: {response.text}\n")
-                f.write(f"Headers: {response.headers}\n")
-            return None
-    except requests.exceptions.Timeout:
-        print("Error: Timeout while converting XLSX to JSON. The server may be unavailable.")
-        return None
-    except Exception as e:
-        print(f"Error sending request: {e}")
-        return None
 
 def main():
     if len(sys.argv) < 2:
@@ -278,31 +22,17 @@ def main():
         sys.exit(1)
     
     user_query = " ".join(sys.argv[1:])
-    print(f"Creating XLSForm for: {user_query}")
+    print(f"Creating form for: {user_query}")
     
-    # Ensure output directory exists
-    ensure_output_directory()
-    
-    # Generate timestamped filenames
-    xlsform_filename = generate_timestamped_filename("xlsform_survey", ".xlsx")
-    json_filename = generate_timestamped_filename("form_result", ".json")
-    
-    # Create the XLSForm
-    xlsform_result = create_xlsform(user_query, xlsform_filename)
-    if not xlsform_result:
-        print("Failed to create XLSForm. Exiting.")
+    try:
+        json_result = generate_form_json(user_query)
+        print("Form generation completed successfully!")
+        print("JSON result:")
+        print(json_result)
+    except Exception as e:
+        print(f"Form generation failed: {e}")
         sys.exit(1)
-    
-    # Convert to JSON
-    print("Converting XLSX to JSON...")
-    json_result = convert_xlsx_to_json(xlsform_filename, json_filename)
-    
-    if json_result:
-        print("Form conversion completed successfully!")
-        print(f"JSON result saved to {json_filename}")
-    else:
-        print("Form conversion failed. Check conversion_error.txt for details.")
-        sys.exit(1)
+
 
 if __name__ == "__main__":
     main()

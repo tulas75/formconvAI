@@ -46,5 +46,6 @@ Rules for valid XLSForm:
 9. Use simple constraints like ". > 0" for positive numbers only if necessary
 10. Save the file in the current working directory
 11. ONLY create the required sheets (survey, choices, settings) - DO NOT create any extra sheets like "Sheet1"
+12. If you cannot save directly to the current directory, save to /tmp and the system will move it to the correct location
 
-Based on the user's requirements, generate a valid XLSForm structure that captures all necessary information in a logical flow. Make sure to include appropriate question types, validation where needed, and clear labels. Keep constraints simple or avoid them entirely to prevent conversion issues. ALWAYS include all three sheets (survey, choices, settings) even if some are empty.
+Based on the user's requirements, generate a valid XLSForm structure that captures all necessary information in a logical flow. Make sure to include appropriate question types, validation where needed, and clear labels. Keep constraints simple or avoid them entirely to prevent conversion issues. ALWAYS include all three sheets (survey, choices, settings) even if some are empty. If you have any issues saving the file to the current directory, save it to /tmp and indicate this in your response.

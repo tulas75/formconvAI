@@ -18,3 +18,30 @@ grep
 
 # Output files directory
 output_files/
+
+# Python cache files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+.coverage
+.coverage.*
+.cache
+.pytest_cache/
+.pytest_cache_*
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+.local
+.pyre/
+.pytype/
+cython_debug/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
