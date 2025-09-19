@@ -12,3 +12,9 @@ grep
 
 # Virtual environment
 .venv/
+
+# Environment variables
+.env
+
+# Output files directory
+output_files/
