@@ -217,12 +217,9 @@ def create_xlsform(user_query: str, xlsform_filename: str, model: LiteLLMModel,
                 "- Make sure to save the file properly in the current directory\n"
                 "- Avoid any complex constraints or validation formulas\n"
                 "- Ensure the file is saved with the exact name '{simple_filename}'\n"
-                "- DO NOT save the file in any temporary directories like /tmp\n"
                 "- The choices sheet must have the headers 'list_name', 'name', 'label' "
                 "even if empty\n"
                 "- Every sheet must have headers in the first row\n"
-                "- If you cannot save directly to the current directory, save to /tmp "
-                "and I will move it"
             )
 
             agent = CodeAgent(tools=tools,
