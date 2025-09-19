@@ -13,6 +13,7 @@ This tool generates XLSForm files using AI and converts them to JSON format usin
 - Generates timestamped filenames to avoid overwriting previous results
 - All generated files are saved in the `output_files` directory
 - Available as both a command-line script and a web API
+- Provides a Gradio web interface for easy interaction
 
 ## How it works
 
@@ -60,6 +61,25 @@ curl -X POST http://localhost:5000/responseAI.json \
   -d '{"query": "Create a survey to collect user feedback with name, email, rating (1-5), and comments fields"}'
 ```
 
+## Usage - Gradio Web Interface
+
+1. Start the Flask server (required for the Gradio interface):
+```bash
+python app.py
+```
+
+2. In a separate terminal, start the Gradio interface:
+```bash
+python interface.py
+```
+
+3. Open your browser and navigate to `http://localhost:7860`
+
+The Gradio interface provides a user-friendly way to generate surveys:
+- Enter your survey requirements in natural language
+- Click "Generate Survey"
+- Download the generated XLSX and JSON files
+
 ## Requirements
 
 - Python 3.8+
@@ -67,8 +87,8 @@ curl -X POST http://localhost:5000/responseAI.json \
 - excel-mcp-server (installed via uvx)
 - requests
 - pandas
-- openpyxl
 - flask
+- gradio
 
 ## Installation
 
@@ -98,6 +118,7 @@ This will return the generated JSON form in the response.
 
 - `main.py`: Command-line interface
 - `app.py`: Flask web API
+- `interface.py`: Gradio web interface
 - `formconv/`: Core functionality as a Python package
 - `xlsform_prompt.txt`: Prompt template for XLSForm generation
 - `output_files/`: Directory where generated files are saved
