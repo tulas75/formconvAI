@@ -208,18 +208,19 @@ def create_xlsform(user_query: str, xlsform_filename: str, model: LiteLLMModel,
                 "Please generate a complete XLSForm structure that addresses the user's "
                 "requirements. Return the result as a valid Excel file with the sheets "
                 "(survey, choices, settings) properly formatted. Create the xlsx file "
-                f"using excel-mcp-server tool. Save the file as '{simple_filename}' in "
-                "the current folder.\n\n"
+                f"using excel-mcp-server tool. Save the file with the exact filename '{simple_filename}' "
+                "in the /tmp directory.\n\n"
                 "Important instructions:\n"
                 "- ALWAYS create ALL three required sheets: survey, choices, and settings "
                 "(even if empty)\n"
                 "- DO NOT create any extra sheets like 'Sheet1'\n"
-                "- Make sure to save the file properly in the current directory\n"
+                "- Make sure to save the file properly in the /tmp directory\n"
                 "- Avoid any complex constraints or validation formulas\n"
                 "- Ensure the file is saved with the exact name '{simple_filename}'\n"
                 "- The choices sheet must have the headers 'list_name', 'name', 'label' "
                 "even if empty\n"
                 "- Every sheet must have headers in the first row\n"
+                "- Save the file in /tmp directory - the system will move it to the correct location\n"
             )
 
             agent = CodeAgent(tools=tools,
